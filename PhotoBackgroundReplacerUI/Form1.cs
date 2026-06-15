@@ -10,11 +10,11 @@ namespace PhotoBackgroundReplacerUI;
 public partial class Form1 : Form
 {
     private readonly string _rootDir;
-    private readonly string _modelPath;
     private readonly string _outputDir;
 
     private readonly Button _pickPersonButton = new() { Text = "Select Person Photo", Width = 180, Height = 48 };
     private readonly Button _pickBackgroundButton = new() { Text = "Select Background", Width = 180, Height = 48 };
+    private readonly Button _pickModelButton = new() { Text = "Select ONNX Model", Width = 180, Height = 48 };
     private readonly Button _runButton = new() { Text = "Replace Background", Width = 190, Height = 48 };
     private readonly Button _openOutputButton = new() { Text = "Open Output Folder", Width = 185, Height = 48 };
     private readonly ComboBox _providerBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 130, Height = 48 };
@@ -26,6 +26,7 @@ public partial class Form1 : Form
 
     private string? _personPath;
     private string? _backgroundPath;
+    private string? _modelPath;
     private string? _lastOutputPath;
 
     public Form1()
@@ -43,7 +44,9 @@ public partial class Form1 : Form
 
         BuildUi();
         WireEvents();
-        SetStatus($"Ready. Model: {Path.GetFileName(_modelPath)}");
+        SetStatus(_modelPath == null
+            ? "Ready. RVM ONNX model not found. Click Select ONNX Model before processing."
+            : $"Ready. Model: {Path.GetFileName(_modelPath)}");
     }
 
     private void BuildUi()
@@ -64,6 +67,7 @@ public partial class Form1 : Form
         top.Controls.AddRange([
             _pickPersonButton,
             _pickBackgroundButton,
+            _pickModelButton,
             LabelOf("Provider"), _providerBox,
             LabelOf("Quality S"), _downsampleInput,
             _runButton,
@@ -110,6 +114,7 @@ public partial class Form1 : Form
     {
         _pickPersonButton.Click += (_, _) => PickImage(isPerson: true);
         _pickBackgroundButton.Click += (_, _) => PickImage(isPerson: false);
+        _pickModelButton.Click += (_, _) => PickModel();
         _runButton.Click += async (_, _) => await RunReplacementAsync();
         _openOutputButton.Click += (_, _) => OpenPath(_lastOutputPath ?? _outputDir);
     }
@@ -140,6 +145,22 @@ public partial class Form1 : Form
         }
     }
 
+    private void PickModel()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "ONNX model|*.onnx|All files|*.*"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        _modelPath = dialog.FileName;
+        SetStatus($"Model selected: {dialog.FileName}");
+    }
+
     private static void LoadPreview(PictureBox target, string path)
     {
         using var src = Cv2.ImRead(path, ImreadModes.Color);
@@ -160,6 +181,12 @@ public partial class Form1 : Form
         if (string.IsNullOrWhiteSpace(_personPath) || string.IsNullOrWhiteSpace(_backgroundPath))
         {
             SetStatus("Select both a person photo and a background image first.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_modelPath) || !File.Exists(_modelPath))
+        {
+            SetStatus("RVM ONNX model not found. Click Select ONNX Model and choose rvm_mobilenetv3_fp32.onnx.");
             return;
         }
 
@@ -260,7 +287,7 @@ public partial class Form1 : Form
         return dst;
     }
 
-    private static string FindDefaultModel(string root)
+    private static string? FindDefaultModel(string root)
     {
         var candidates = new[]
         {
@@ -269,8 +296,7 @@ public partial class Form1 : Form
             Path.GetFullPath(Path.Combine(root, "..", "depth_matting_client", "models", "rvm_mobilenetv3_fp32.onnx"))
         };
 
-        return candidates.FirstOrDefault(File.Exists)
-            ?? throw new FileNotFoundException("RVM ONNX model not found.");
+        return candidates.FirstOrDefault(File.Exists);
     }
 
     private static void OpenPath(string path)

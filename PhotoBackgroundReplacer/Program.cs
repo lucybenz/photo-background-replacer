@@ -56,7 +56,7 @@ internal static class Program
         var errors = new List<string>();
         foreach (var useGpu in options.Provider switch
         {
-            ProviderMode.DirectML => new[] { true, false },
+            ProviderMode.DirectML => new[] { true },
             ProviderMode.Cpu => new[] { false },
             _ => new[] { true, false }
         })

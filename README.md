@@ -10,6 +10,7 @@
 - ONNX Runtime DirectML 推理，优先使用 Windows 独立显卡
 - 支持命令行批处理
 - 支持 WinForms 图形界面
+- UI 找不到默认模型时仍可打开，可在界面中手动选择 `.onnx` 模型
 
 ## 环境要求
 
@@ -47,6 +48,14 @@ https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobi
 dotnet run --project .\PhotoBackgroundReplacerUI
 ```
 
+UI 使用步骤：
+
+1. 点击选择人物照片。
+2. 点击选择背景图片。
+3. 如果状态栏提示找不到模型，点击 `Select ONNX Model` 选择 RVM ONNX 模型。
+4. 选择 DirectML、CPU 或 Auto。
+5. 点击替换背景。
+
 ## 命令行用法
 
 ```powershell
@@ -66,6 +75,8 @@ dotnet run --project .\PhotoBackgroundReplacer -- --input person.jpg --backgroun
 - `--output`：输出 PNG 路径，不填写时保存到 `outputs`
 - `--downsample`：RVM 下采样比例，默认 `0.125`
 - `--provider`：`auto`、`dml` 或 `cpu`，默认 `auto`
+
+`auto` 会先尝试 DirectML，失败后回退 CPU。`dml` 只使用 DirectML，适合确认独立显卡是否真的参与推理。
 
 ## 使用建议
 
