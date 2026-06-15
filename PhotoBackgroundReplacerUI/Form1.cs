@@ -191,6 +191,7 @@ public partial class Form1 : Form
         }
 
         _runButton.Enabled = false;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         SetStatus("Replacing background. Full-resolution processing may take a while...");
         try
         {
@@ -202,10 +203,11 @@ public partial class Form1 : Form
             var modelPath = _modelPath;
 
             var result = await Task.Run(() => ProcessImage(personPath, backgroundPath, outputPath, modelPath, provider, downsample));
-            _lastOutputPath = result;
-            LoadPreview(_resultPreview, result);
-            SetStatus($"Saved result: {result}");
-            OpenPath(result);
+            clock.Stop();
+            _lastOutputPath = result.OutputPath;
+            LoadPreview(_resultPreview, result.OutputPath);
+            SetStatus($"Saved result: {result.OutputPath} | Provider {result.ProviderName} | {clock.Elapsed.TotalSeconds:F1}s");
+            OpenPath(result.OutputPath);
         }
         catch (Exception ex)
         {
@@ -218,7 +220,7 @@ public partial class Form1 : Form
         }
     }
 
-    private static string ProcessImage(string personPath, string backgroundPath, string outputPath, string modelPath, int provider, float downsample)
+    private static ProcessingResult ProcessImage(string personPath, string backgroundPath, string outputPath, string modelPath, int provider, float downsample)
     {
         using var person = Cv2.ImRead(personPath, ImreadModes.Color);
         using var background = Cv2.ImRead(backgroundPath, ImreadModes.Color);
@@ -233,12 +235,12 @@ public partial class Form1 : Form
         }
 
         using var bg = CoverResize(background, person.Width, person.Height);
-        using var result = RunMattingWithFallback(person, bg, modelPath, provider, downsample);
+        using var result = RunMattingWithFallback(person, bg, modelPath, provider, downsample, out var providerName);
         Cv2.ImWrite(outputPath, result);
-        return outputPath;
+        return new ProcessingResult(outputPath, providerName);
     }
 
-    private static Mat RunMattingWithFallback(Mat person, Mat bg, string modelPath, int provider, float downsample)
+    private static Mat RunMattingWithFallback(Mat person, Mat bg, string modelPath, int provider, float downsample, out string providerName)
     {
         var providers = provider switch
         {
@@ -252,6 +254,7 @@ public partial class Form1 : Form
             try
             {
                 using var model = new RvmOnnxMatting(modelPath, useGpu);
+                providerName = model.ProviderName;
                 return model.Matte(person, downsample, bg);
             }
             catch (Exception ex)
@@ -260,6 +263,7 @@ public partial class Form1 : Form
             }
         }
 
+        providerName = "Unavailable";
         throw new InvalidOperationException("Matting failed. " + string.Join(" | ", errors));
     }
 
@@ -325,6 +329,7 @@ public sealed class RvmOnnxMatting : IDisposable
     private readonly InferenceSession _session;
     private DenseTensor<float>[] _rec = CreateInitialRec();
     private readonly string[] _inputNames;
+    public string ProviderName { get; }
 
     public RvmOnnxMatting(string modelPath, bool useGpu)
     {
@@ -337,6 +342,11 @@ public sealed class RvmOnnxMatting : IDisposable
         if (useGpu)
         {
             options.AppendExecutionProvider_DML(0);
+            ProviderName = "DirectML";
+        }
+        else
+        {
+            ProviderName = "CPU";
         }
 
         _session = new InferenceSession(modelPath, options);
@@ -427,3 +437,5 @@ public sealed class RvmOnnxMatting : IDisposable
 
     public void Dispose() => _session.Dispose();
 }
+
+public sealed record ProcessingResult(string OutputPath, string ProviderName);

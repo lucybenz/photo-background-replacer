@@ -1,0 +1,41 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore CLI
+        run: dotnet restore PhotoBackgroundReplacer/PhotoBackgroundReplacer.csproj
+
+      - name: Restore UI
+        run: dotnet restore PhotoBackgroundReplacerUI/PhotoBackgroundReplacerUI.csproj
+
+      - name: Build CLI
+        run: dotnet build PhotoBackgroundReplacer/PhotoBackgroundReplacer.csproj -c Release --no-restore
+
+      - name: Build UI
+        run: dotnet build PhotoBackgroundReplacerUI/PhotoBackgroundReplacerUI.csproj -c Release --no-restore
+
+      - name: Publish CLI
+        run: dotnet publish PhotoBackgroundReplacer/PhotoBackgroundReplacer.csproj -c Release -r win-x64 --self-contained false -o artifacts/photo-background-replacer/cli
+
+      - name: Publish UI
+        run: dotnet publish PhotoBackgroundReplacerUI/PhotoBackgroundReplacerUI.csproj -c Release -r win-x64 --self-contained false -o artifacts/photo-background-replacer/ui
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: photo-background-replacer-win-x64
+          path: artifacts/photo-background-replacer
