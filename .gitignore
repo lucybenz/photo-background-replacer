@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+*.user
+outputs/
+logs/
+models/*.onnx
+models/*.pth
+*.jpg
+*.jpeg
+*.png
+*.webp
+!README.md
